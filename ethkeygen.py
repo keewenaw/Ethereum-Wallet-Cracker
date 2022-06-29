@@ -2,8 +2,6 @@
 
 #############################################
 #
-# WORK IN PROGRESS
-#
 # This script does the following:
 #	Pulls entropy from a given file (Rockyou.txt or a similar password list works)
 #	Creates an Ethereum wallet from this entropy
@@ -12,7 +10,8 @@
 # 	In the infinitesimally small chance we found an active wallet, the keys are weak so let's steal the balance
 #
 # Project TODOs:
-#	Verboseness
+#	Verbosity setting
+# 	Better error handling for web3 calls
 #	Check for any ERC tokens, not just Ether specifically
 #	Add more wordlists to source file
 #	Allow for other-language wordlists
@@ -23,7 +22,6 @@
 
 import csv, eth_utils
 from web3 import Web3
-from eth_keys import keys
 from eth_account.account import Account
 from sys import getsizeof # Because apparently it will shit the bed otherwise; TODO: why can't we just 'import sys'?
 
@@ -31,7 +29,7 @@ __author__ = "Mark Rudnitsky"
 __copyright__ = "(C)2022 Mark Rudnitsky"
 __credits__ = ["Mark Rudnitsky"]
 __license__ = "GPLv3"
-__version__ = "0.1"
+__version__ = "1.0"
 __maintainer__ = "Mark Rudnitsky"
 __status__ = "Prototype"
 
@@ -96,6 +94,7 @@ def findANonZeroBalance(entropy):
 
 # Main function
 def main():
+	print("[INFO] Generating keys, this will take a while ...")
 	# Open up our source of entropy
 	sourceFile = open(keygenFile)
 
@@ -137,7 +136,8 @@ def main():
 
 				# Pad 50/50 Left/Right split
 				findANonZeroBalance(bytes(int(pad / 2)) + tempLine + bytes(int(pad / 2)) + bytes(int(pad % 2)))
-			
+				
+	print("[INFO] Keygen complete, please check \'" + dictFileName + "\' in this directory for details.")
 	sourceFile.close()
 
 # Main function
