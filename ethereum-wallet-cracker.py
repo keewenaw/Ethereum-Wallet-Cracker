@@ -30,6 +30,7 @@
 #	Add more wordlists to source file
 #	Allow for other-language wordlists
 #	Pull in any source files in a directory
+# 	Check if this address ever had coins in it and if they were just stolen
 #	Generate mnemonic phrases for secondary fuzzing - https://github.com/de-centralized-systems/python-bip39/
 #
 #############################################
