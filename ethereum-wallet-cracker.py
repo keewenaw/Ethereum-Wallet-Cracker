@@ -54,6 +54,7 @@ __status__ = "Prototype"
 ##### CHANGE THESE ASAP #####
 #
 # Entropy source (rockyou.txt or other password list is a good place to start)
+# Another useful tool: https://kalilinuxtutorials.com/cook/
 keygenFile = "rockyou.txt"
 # Filename of database for generated keypairs
 dictFileName = "generated-keypairs.csv"
