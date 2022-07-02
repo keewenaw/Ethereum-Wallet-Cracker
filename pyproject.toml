@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ethereum-wallet-cracker"
+version = "1.2.0"
+authors = [
+  { name="Mark Rudnitsky", email="blockchainsecurityconsultants@pm.me" },
+]
+description = "A script to steal Ether from wallets suffering from insufficient entropy during key generation."
+readme = "README.md"
+license = { file="LICENSE" }
+requires-python = ">=3.7"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/mrudnitsky/ethereum-wallet-cracking"
+"Bug Tracker" = "https://github.com/mrudnitsky/ethereum-wallet-cracking/issues"
