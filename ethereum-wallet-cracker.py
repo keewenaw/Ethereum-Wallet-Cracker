@@ -6,14 +6,6 @@ from eth_account.account import Account
 from configparser import ConfigParser
 from sys import getsizeof
 
-__author__ = "Mark Rudnitsky"
-__copyright__ = "(C)2022 Mark Rudnitsky"
-__credits__ = ["Mark Rudnitsky"]
-__license__ = "GPLv3"
-__version__ = "1.2"
-__maintainer__ = "Mark Rudnitsky"
-__status__ = "Production"
-
 VERBOSITY_NONE = 0
 VERBOSITY_LOW = 1
 VERBOSITY_MEDIUM = 2
