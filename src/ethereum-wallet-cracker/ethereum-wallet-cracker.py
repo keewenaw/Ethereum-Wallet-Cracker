@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Ethereum Wallet Cracker
+# (c) 2022 Mark Rudnitsky
 
 import os, sys, csv, eth_utils
 from web3 import Web3
