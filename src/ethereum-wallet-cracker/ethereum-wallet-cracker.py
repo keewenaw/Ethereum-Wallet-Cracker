@@ -86,7 +86,7 @@ def checkConfig():
 		if not infuraKey:
 			print("\t[ERROR] This needs to be set before the program will run. Be sure to update this later.")
 
-		print("   8) Are you using HTTP or WebSockets (wss)?\n\t(Choose HTTP if you don't know)\n\t(Default: \'HTTP\'")
+		print("   8) Are you using HTTP or WebSockets (wss)?\n\t(Choose HTTP if you don't know)\n\t(Default: \'HTTP\')")
 		connectionUrlSelection = str(input("\tConnection type: ")).lower()
 		if "wss" in connectionUrlSelection:
 			connectionUrl = "wss://mainnet.infura.io/ws/v3/" + infuraKey
