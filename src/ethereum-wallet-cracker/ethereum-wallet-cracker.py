@@ -41,9 +41,9 @@ def checkConfig():
 		dbFileName = str(input("\tFilename: "))
 		if not dbFileName:
 			dbFileName = "keys.csv"
-			
-		print("   2b) Enter a directory to save the CSV file in:\n\t(Default: \'" + dbFileLocation + "\')")
+		
 		dbFileLocation = os.path.expanduser('~') + "/Desktop/" 
+		print("   2b) Enter a directory to save the CSV file in:\n\t(Default: \'" + dbFileLocation + "\')")
 		dbTempFileLocation = str(input("\tLocation: "))
 		if dbTempFileLocation:
 			dbFileLocation = dbTempFileLocation
