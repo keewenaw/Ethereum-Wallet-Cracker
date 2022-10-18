@@ -17,7 +17,7 @@ At a high level, this script does the following:
 * Reporting of all generated keypairs into user-specified file
 * Granular verbosity settings
 
-# Usage
+# Installation
 ## Manual
 1) ```sudo apt install python3-pip```
 
