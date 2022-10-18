@@ -18,9 +18,6 @@ At a high level, this script does the following:
 * Granular verbosity settings
 
 # Usage
-## Easy
-pip3 install ethereum-wallet-cracker
-
 ## Manual
 1) ```sudo apt install python3-pip```
 
