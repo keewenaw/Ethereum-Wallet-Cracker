@@ -1,5 +1,5 @@
 # Ethereum Wallet Cracker
-## (c) 2022 Mark Rudnitsky
+## (c) 2022 Keewenaw 
 
 A script to steal Ether from wallets suffering from insufficient entropy during key generation.
 
