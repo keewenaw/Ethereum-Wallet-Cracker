@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # Ethereum Wallet Cracker
-# (c) 2022 Mark Rudnitsky
+# (c) 2022-Present Keewenaw
+# Not actively updated - use at your own risk
 
 import os, sys, csv, eth_utils
-from web3 import Web3
+from web3 import Web3, WebSocketProvider
 from eth_account.account import Account
 from configparser import ConfigParser
 from sys import getsizeof
@@ -133,13 +134,13 @@ def connect(connectionUrl):
 	print("[INFO] Connecting to Ethereum mainnet ...")
 	try:
 		if (connectionUrl.startswith('wss')): # Websockets
-			web3Instance = Web3(Web3.WebsocketProvider(connectionUrl))
+			const web3Instance = new Web3(new WebSocketProvider(connectionUrl))
 		else: # HTTP(S)
-			web3Instance = Web3(Web3.HTTPProvider(connectionUrl))
+			const web3Instance = Web3(Web3.HTTPProvider(connectionUrl))
 	except:
 		sys.exit("[ERROR] There was an error with connecting to the Infura APIs. Check your API key and the config file for issues.")
 	# Double check our connection works
-	if not web3Instance.isConnected():
+	if not web3Instance.is_connected():
 		sys.exit("[ERROR] Cannot connect to given URL. Please verify the correctness of the URL and if the site is online.")
 	return web3Instance
 
