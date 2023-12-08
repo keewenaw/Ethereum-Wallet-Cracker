@@ -32,3 +32,7 @@ At a high level, this script does the following:
 *	Check for any ERC tokens, not just Ether specifically
 * Check if this address ever had coins in it and if they were previously moved
 *	Generate mnemonic phrases for secondary fuzzing - https://github.com/de-centralized-systems/python-bip39/
+
+# Need Customization Help?
+
+Contact me @Keewenaw on Telegram or here on GitHub. I'm happy to work with you to customize the script or provide you with white-glove consulting solutions for recovering the private key to your own Ethereum wallet.
