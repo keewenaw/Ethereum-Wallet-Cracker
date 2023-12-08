@@ -33,6 +33,6 @@ At a high level, this script does the following:
 * Check if this address ever had coins in it and if they were previously moved
 *	Generate mnemonic phrases for secondary fuzzing - https://github.com/de-centralized-systems/python-bip39/
 
-# Need Customization Help?
+# Need Help?
 
-Contact me @Keewenaw on Telegram or here on GitHub. I'm happy to work with you to customize the script or provide you with white-glove consulting solutions for recovering the private key to your own Ethereum wallet.
+I don't usually check open issues on this repo. If you need hands-on help, contact me @Keewenaw on Telegram, LinkedIn, or here on GitHub. I'm happy to work with you to, for a fee, customize the script or provide you with white-glove consulting solutions for recovering the private key to your own Ethereum wallet.
